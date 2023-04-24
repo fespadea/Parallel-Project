@@ -12,6 +12,7 @@ double normFro2(double** A, int n, int m){
     }
     double totalSum = 0;
     MPI_Reduce(&sum, &totalSum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&totalSum, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     return totalSum;
 }
 
@@ -28,6 +29,7 @@ double norm1(double** A, int n, int m){
     }
     double totalSumMax = 0;
     MPI_Reduce(&sumMax, &totalSumMax, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&totalSumMax, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     return totalSumMax;
 }
 
@@ -114,10 +116,6 @@ int rankOfMatrix(double ** mat, int R, int C)
             // Process this row again
             row--;
         }
- 
-       // Uncomment these lines to see intermediate results
-       // display(mat, R, C);
-       // printf("\n");
     }
     return rank;
 }
@@ -198,8 +196,6 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
     }
     MPI_Bcast(&k, 1, MPI_INT, 0, MPI_COMM_WORLD);
     int s = sMult * k * (totaln + m);
-    printf("s: %i\n", s);
-    printf("k: %i\n", k);
 
     // calculate probabilities for each value of being chosen
     int totalLength = n*m;
@@ -212,22 +208,23 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
     }
     double totalSum = 0;
     MPI_Reduce(&sum, &totalSum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&totalSum, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     sum = totalSum;
 
 
     int * choices = (int *)malloc(sizeof(int)*s);
     if(rank != 0){
-        MPI_Send(probabilities,totalLength,MPI_DOUBLE,0,1,MPI_COMM_WORLD);
+        MPI_Send(probabilities, totalLength, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD);
 
         int i = 0;
         do{
             MPI_Status status;
-            MPI_Recv(choices + i*sizeof(int), 1, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
+            MPI_Recv(choices + i, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
         } while(choices[i++] != -1);
     } else{
         for(int i = 1; i < nranks; i++){
             MPI_Status status;
-            MPI_Recv(probabilities + i*totalLength*sizeof(double), totalLength, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, &status);
+            MPI_Recv(probabilities + i*totalLength, totalLength, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, &status);
         }
 
         // choose the indexes using the probabilities
@@ -239,10 +236,8 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
         double probSum = 0;
         int p = 0;
         for(int j = 0; p < s; j++){
-            // printf("%lf\n", probabilities[j]);
             probSum += probabilities[j];
-            while(probSum >= probs[p]){
-                // printf("%i\n", p);
+            while(probSum >= probs[p] && p < s){
                 if(j < totalLength){
                     choices[p] = j;
                 } else{
@@ -261,7 +256,6 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
 
         free(probs);
     }
-
 
 
     // combine the chosen values into a sparse matrix

@@ -33,12 +33,9 @@ int main(int argc, char **argv){
 
     unsigned long long start_cycles= clock_now();
     
-    printf("%i\n", buf[nints-1]);
     MPI_File_open(MPI_COMM_WORLD, "formattedData.dat", MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
     MPI_File_read_at(fh, rank*bufsize, buf, nints, MPI_INT, &status);
     MPI_File_close(&fh);
-
-    printf("%i\n", buf[nints-1]);
     
     FILE* dataFile = fopen("formattedData.dat", "r");
     double ** dataMatrix = (double**)malloc(n * sizeof(double*));
@@ -68,9 +65,10 @@ int main(int argc, char **argv){
 
     unsigned long long end_cycles= clock_now();
 
-    printf("%lf\n", error(dataMatrix, ATilde, n, m));
-    double time_in_secs_CUDA = ((double)(start_cycles - end_cycles)) / clock_frequency;
-    printf("CUDA Reduce Sum Seconds Taken: %lf\n", time_in_secs_CUDA);
+    if(rank == 0){
+        double time_in_secs_CUDA = ((double)(start_cycles - end_cycles)) / clock_frequency;
+        printf("CUDA Reduce Sum Seconds Taken: %lf\n", time_in_secs_CUDA);
+    }
 
     free(ATilde);
     free(dataMatrix);
