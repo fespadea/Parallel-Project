@@ -180,5 +180,5 @@ double error(double ** A, double ** ATilde, int n, int m){
     }
     double error = norm1(ADiff, n, m) / norm1(A, n, m);
     free(ADiff);
-    return log(error) / log(2);
+    return error;
 }
