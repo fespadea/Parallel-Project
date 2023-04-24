@@ -17,6 +17,7 @@ int main(int argc, char **argv){
     printf("%d %d\n", n, m);
     int totalLength = n * m;
 
+    unsigned long long start_cycles= clock_now();
     
     FILE* dataFile = fopen("formattedData.tsv", "r");
     double ** dataMatrix = (double**)malloc(n * sizeof(double*));
@@ -33,6 +34,8 @@ int main(int argc, char **argv){
     double alpha = 0.5;
 
     double ** ATilde = matrixSparsification(dataMatrix, n, m, epsilon, delta, sMult, alpha);
+    
+    unsigned long long end_cycles= clock_now();
 
     printf("%lf\n", error(dataMatrix, ATilde, n, m));
 
