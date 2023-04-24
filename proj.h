@@ -16,21 +16,23 @@ double normFro2(double** A, int n, int m){
     return totalSum;
 }
 
-double norm1(double** A, int n, int m){
+double norm1(double** A, int n, int m, int rank){
     double sumMax = 0;
     for(int j = 0; j < m; j++){
         double sum = 0;
         for(int i = 0; i < n; i++){
             sum += fabs(A[i][j]);
         }
-        if(sum > sumMax){
-            sumMax = sum;
+        double totalSum = 0;
+        MPI_Reduce(&sum, &totalSum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+        if(rank == 0){
+            if(totalSum > sumMax){
+                sumMax = totalSum;
+            }
         }
     }
-    double totalSumMax = 0;
-    MPI_Reduce(&sumMax, &totalSumMax, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&totalSumMax, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    return totalSumMax;
+    MPI_Bcast(&sumMax, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    return sumMax;
 }
 
 // Code from geeksforgeeks: https://www.geeksforgeeks.org/program-for-rank-of-matrix/
@@ -48,6 +50,15 @@ void swap(double ** mat, int R, int C, int row1, int row2,
 // Code from geeksforgeeks: https://www.geeksforgeeks.org/program-for-rank-of-matrix/
 int rankOfMatrix(double ** mat, int R, int C)
 {
+    double ** matCopy = (double **)malloc(R*sizeof(double*));
+    for(int i = 0; i < R; i++){
+        matCopy[i] = (double *)malloc(C*sizeof(double));
+        for(int j = 0; j < C; j++){
+            matCopy[i][j] = mat[i][j];
+        }
+    }
+    mat = matCopy;
+
     int rank = C;
  
     for (int row = 0; row < rank; row++)
@@ -117,6 +128,7 @@ int rankOfMatrix(double ** mat, int R, int C)
             row--;
         }
     }
+    free(mat);
     return rank;
 }
 
@@ -189,7 +201,7 @@ void mergeSort(double arr[], int l, int r)
 double ** matrixSparsification(double ** A, int n, int m, double epsilon, double delta, int sMult, double alpha, int totaln, int rank, int nranks){
     // get paramters ready
     double AF2 = normFro2(A, n, m);
-    double A1 = norm1(A, n, m);
+    double A1 = norm1(A, n, m, rank);
     int k;
     if(rank == 0){
         k = rankOfMatrix(A, n, m);
@@ -228,7 +240,7 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
         }
 
         // choose the indexes using the probabilities
-        double * probs = (double *)malloc(sizeof(double)*s);
+        double * probs = (double *)malloc(sizeof(double)*s);\
         for(int i = 0; i < s; i++){
             probs[i] = ((double)rand() / (double)RAND_MAX) * sum;
         }
@@ -280,7 +292,7 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
     return ATilde;
 }
 
-double error(double ** A, double ** ATilde, int n, int m){
+double error(double ** A, double ** ATilde, int n, int m, int rank){
     double ** ADiff = (double**)malloc(n * sizeof(double*));
     for(int i = 0; i < n; i++){
         ADiff[i] = (double*)malloc(m * sizeof(double));
@@ -288,7 +300,7 @@ double error(double ** A, double ** ATilde, int n, int m){
             ADiff[i][j] = A[i][j] - ATilde[i][j];
         }
     }
-    double error = norm1(ADiff, n, m) / norm1(A, n, m);
+    double error = norm1(ADiff, n, m, rank) / norm1(A, n, m, rank);
     free(ADiff);
     return log(error) / log(2);
 }
