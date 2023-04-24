@@ -189,6 +189,7 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
     double A1 = norm1(A, n, m);
     int k = rankOfMatrix(A, n, m);
     int s = sMult * k * (n+m);
+    printf("s: %i\n", s);
 
     // calculate probabilities for each value of being chosen
     int totalLength = n*m;
@@ -203,7 +204,8 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
     // choose the indexes using the probabilities
     double * probs = (double *)malloc(sizeof(double)*s);
     for(int i = 0; i < s; i++){
-        probs[i] = ((double)rand() / (double)RAND_MAX) * sum;
+        int ra = rand();
+        probs[i] = ((double)ra / (double)RAND_MAX) * sum;
     }
     mergeSort(probs, 0, s-1);
     int * choices = (int *)malloc(sizeof(int)*s);
@@ -211,7 +213,7 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
     int p = 0;
     for(int j = 0; p < s; j++){
         probSum += probabilities[j];
-        while(probSum >= probs[p]){
+        while(probSum >= probs[p] && p < s){
             choices[p] = j;
             p++;
         }
