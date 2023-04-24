@@ -125,6 +125,8 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
     int k = rankOfMatrix(A, n, m);
     int s = sMult * k * (n+m);
 
+    printf("%i\n", s);
+
     // calculate probabilities for each value of being chosen
     int totalLength = n*m;
     double * probabilities = (double *)malloc(sizeof(double)*(totalLength));
@@ -134,7 +136,7 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
         probabilities[i] = alpha * fabs(Aij) / A1 + (1 - alpha) * (Aij * Aij) / AF2;
         sum += probabilities[i];
     }
-    printf("probabilities calculated");
+    printf("probabilities calculated\n");
 
     // choose the indexes using the probabilities
     int * choices = (int *)malloc(sizeof(int)*s);
@@ -145,8 +147,9 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
             choices[i] = j;
             probSum += probabilities[j];
         }
+        printf("%i\n", i);
     }
-    printf("choices chosen");
+    printf("choices chosen\n");
 
     // combine the chosen values into a sparse matrix
     double ** ATilde = (double**)calloc(n * sizeof(double*), sizeof(double*));
@@ -159,7 +162,7 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
         int j = choice % m;
         ATilde[i][j] += A[i][j] / probabilities[choice] / s;
     }
-    printf("sparsified");
+    printf("sparsified\n");
     
     free(probabilities);
     free(choices);
