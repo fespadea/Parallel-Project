@@ -26,8 +26,7 @@ double norm1(double** A, int n, int m){
     return sumMax;
 }
 
-/* function for exchanging two rows of
-   a matrix */
+// Code from geeksforgeeks: https://www.geeksforgeeks.org/program-for-rank-of-matrix/
 void swap(double ** mat, int R, int C, int row1, int row2,
           int col)
 {
@@ -39,7 +38,7 @@ void swap(double ** mat, int R, int C, int row1, int row2,
     }
 }
 
-/* function for finding rank of matrix */
+// Code from geeksforgeeks: https://www.geeksforgeeks.org/program-for-rank-of-matrix/
 int rankOfMatrix(double ** mat, int R, int C)
 {
     int rank = C;
@@ -118,14 +117,78 @@ int rankOfMatrix(double ** mat, int R, int C)
     return rank;
 }
 
+// Code from geeksforgeeks: https://www.geeksforgeeks.org/merge-sort/
+void merge(double arr[], int l, int m, int r)
+{
+    int i, j, k;
+    int n1 = m - l + 1;
+    int n2 = r - m;
+ 
+    /* create temp arrays */
+    double * L = (double *)malloc(sizeof(double) * n1);
+    double * R = (double *)malloc(sizeof(double) * n2);
+ 
+    /* Copy data to temp arrays L[] and R[] */
+    for (i = 0; i < n1; i++)
+        L[i] = arr[l + i];
+    for (j = 0; j < n2; j++)
+        R[j] = arr[m + 1 + j];
+ 
+    /* Merge the temp arrays back into arr[l..r]*/
+    i = 0; // Initial index of first subarray
+    j = 0; // Initial index of second subarray
+    k = l; // Initial index of merged subarray
+    while (i < n1 && j < n2) {
+        if (L[i] <= R[j]) {
+            arr[k] = L[i];
+            i++;
+        }
+        else {
+            arr[k] = R[j];
+            j++;
+        }
+        k++;
+    }
+ 
+    /* Copy the remaining elements of L[], if there
+    are any */
+    while (i < n1) {
+        arr[k] = L[i];
+        i++;
+        k++;
+    }
+ 
+    /* Copy the remaining elements of R[], if there
+    are any */
+    while (j < n2) {
+        arr[k] = R[j];
+        j++;
+        k++;
+    }
+}
+ 
+// Code from geeksforgeeks: https://www.geeksforgeeks.org/merge-sort/
+void mergeSort(double arr[], int l, int r)
+{
+    if (l < r) {
+        // Same as (l+r)/2, but avoids overflow for
+        // large l and h
+        int m = l + (r - l) / 2;
+ 
+        // Sort first and second halves
+        mergeSort(arr, l, m);
+        mergeSort(arr, m + 1, r);
+ 
+        merge(arr, l, m, r);
+    }
+}
+
 double ** matrixSparsification(double ** A, int n, int m, double epsilon, double delta, int sMult, double alpha){
     // get paramters ready
     double AF2 = normFro2(A, n, m);
     double A1 = norm1(A, n, m);
     int k = rankOfMatrix(A, n, m);
     int s = sMult * k * (n+m);
-
-    printf("%i\n", s);
 
     // calculate probabilities for each value of being chosen
     int totalLength = n*m;
@@ -136,20 +199,23 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
         probabilities[i] = alpha * fabs(Aij) / A1 + (1 - alpha) * (Aij * Aij) / AF2;
         sum += probabilities[i];
     }
-    printf("probabilities calculated\n");
 
     // choose the indexes using the probabilities
-    int * choices = (int *)malloc(sizeof(int)*s);
+    double * probs = (double *)malloc(sizeof(double)*s);
     for(int i = 0; i < s; i++){
-        double prob = ((double)rand() / (double)RAND_MAX) * sum;
-        double probSum = 0;
-        for(int j = 0; probSum < prob; j++){
-            choices[i] = j;
-            probSum += probabilities[j];
-        }
-        // printf("%i\n", i);
+        probs[i] = ((double)rand() / (double)RAND_MAX) * sum;
     }
-    printf("choices chosen\n");
+    mergeSort(probs, 0, s-1);
+    int * choices = (int *)malloc(sizeof(int)*s);
+    double probSum = 0;
+    int p = 0;
+    for(int j = 0; p < s; j++){
+        probSum += probabilities[j];
+        while(probSum >= probs[p]){
+            choices[p] = j;
+            p++;
+        }
+    }
 
     // combine the chosen values into a sparse matrix
     double ** ATilde = (double**)calloc(n * sizeof(double*), sizeof(double*));
@@ -162,10 +228,10 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
         int j = choice % m;
         ATilde[i][j] += A[i][j] / probabilities[choice] / s;
     }
-    printf("sparsified\n");
     
     free(probabilities);
     free(choices);
+    free(probs);
 
     return ATilde;
 }
@@ -180,5 +246,5 @@ double error(double ** A, double ** ATilde, int n, int m){
     }
     double error = norm1(ADiff, n, m) / norm1(A, n, m);
     free(ADiff);
-    return error;
+    return log(error) / log(2);
 }
