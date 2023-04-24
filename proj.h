@@ -134,6 +134,7 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
         probabilities[i] = alpha * fabs(Aij) / A1 + (1 - alpha) * (Aij * Aij) / AF2;
         sum += probabilities[i];
     }
+    print("probabilities calculated");
 
     // choose the indexes using the probabilities
     int * choices = (int *)malloc(sizeof(int)*s);
@@ -145,6 +146,7 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
             probSum += probabilities[j];
         }
     }
+    print("choices chosen");
 
     // combine the chosen values into a sparse matrix
     double ** ATilde = (double**)calloc(n * sizeof(double*), sizeof(double*));
@@ -157,6 +159,7 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
         int j = choice % m;
         ATilde[i][j] += A[i][j] / probabilities[choice] / s;
     }
+    print("sparsified");
     
     free(probabilities);
     free(choices);
