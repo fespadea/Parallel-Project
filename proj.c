@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <mpi.h>
+// #include <mpi.h>
 #include "clockcycle.h"
 #include "proj.h"
 
@@ -34,7 +34,7 @@ int main(int argc, char **argv){
     double alpha = 0.5;
 
     double ** ATilde = matrixSparsification(dataMatrix, n, m, epsilon, delta, sMult, alpha);
-    
+
     unsigned long long end_cycles= clock_now();
 
     printf("%lf\n", error(dataMatrix, ATilde, n, m));
