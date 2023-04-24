@@ -9,4 +9,4 @@ module load spectrum-mpi cuda/11.2
 #####################################################################################################
 
 RANKS_PER_NODE=$1
-taskset -c 0-159:4 mpirun -N $RANKS_PER_NODE "python /gpfs/u/home/SPNR/SPNRcaro/scratch/Project/proj.py"
+taskset -c 0-159:4 mpirun -N $RANKS_PER_NODE proj
