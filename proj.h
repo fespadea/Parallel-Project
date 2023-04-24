@@ -147,7 +147,7 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
             choices[i] = j;
             probSum += probabilities[j];
         }
-        printf("%i\n", i);
+        // printf("%i\n", i);
     }
     printf("choices chosen\n");
 
