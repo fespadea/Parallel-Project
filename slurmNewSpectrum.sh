@@ -4,4 +4,4 @@ COMPUTE_NODES=$1
 RANKS_PER_NODE=$2
 DIR="./"
 
-sbatch -p el8 -N $COMPUTE_NODES --gres=gpu:1 --mail-type=ALL --mail-user=fespadearocks@gmail.com -t 5 -D $DIR -o $DIR/proj$1-$2.stdout -e $DIR/proj$1-$2.stderr $DIR/run_job.sh $RANKS_PER_NODE
+sbatch -p el8 -N $COMPUTE_NODES --gres=gpu:4 --mail-type=ALL --mail-user=fespadearocks@gmail.com -t 5 -D $DIR -o $DIR/proj$1-$2.stdout -e $DIR/proj$1-$2.stderr $DIR/run_job.sh $RANKS_PER_NODE

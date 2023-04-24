@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-// #include <mpi.h>
+#include <mpi.h>
 #include "clockcycle.h"
 #include "proj.h"
 
 #define clock_frequency 512000000
 
 int main(int argc, char **argv){
-    FILE* metaDataFile = fopen("formattedMetaData.tsv", "r");
+    FILE* metaDataFile = fopen("formattedMetaData.dat", "r");
     int n;
     fscanf(metaDataFile, "%d", &n);
     int m;
@@ -17,14 +17,33 @@ int main(int argc, char **argv){
     printf("%d %d\n", n, m);
     int totalLength = n * m;
 
+    
+    int rank, nprocs;
+    MPI_File fh;
+    MPI_Status status;
+    int bufsize, nints;
+    
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+
+    bufsize = totalLength*sizeof(int)/nprocs;
+    int *buf = (int *)malloc(bufsize);
+    nints = bufsize/sizeof(int);
+
     unsigned long long start_cycles= clock_now();
     
-    FILE* dataFile = fopen("formattedData.tsv", "r");
+    MPI_File_open(MPI_COMM_WORLD, "formattedData.dat", MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
+    MPI_File_read_at(fh, rank*bufsize, buf, nints, MPI_INT, &status);
+    MPI_File_close(&fh);
+    
+    FILE* dataFile = fopen("formattedData.dat", "r");
     double ** dataMatrix = (double**)malloc(n * sizeof(double*));
-    for(int i = 0; i < n; i++){
+    int localn = nints/m;
+    for(int i = 0; i < localn; i++){
         dataMatrix[i] = (double*)malloc(m * sizeof(double));
         for(int j = 0; j < m; j++){
-            fscanf(dataFile, "%lf", &dataMatrix[i][j]);
+            dataMatrix[i][j] = buf[i*m + j];
         }
     }
 
@@ -33,25 +52,28 @@ int main(int argc, char **argv){
     int sMult = 3;
     double alpha = 0.5;
 
-    double ** ATilde = matrixSparsification(dataMatrix, n, m, epsilon, delta, sMult, alpha);
+    double ** ATilde = matrixSparsification(dataMatrix, localn, m, epsilon, delta, sMult, alpha, n, rank, nprocs);
+
+    for(int i = 0; i < localn; i++){
+        for(int j = 0; j < m; j++){
+            buf[i*m + j] = ATilde[i][j];
+        }
+    }
+    MPI_File_open(MPI_COMM_WORLD, "output.dat", MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
+    MPI_File_write_at(fh, rank*bufsize, buf, nints, MPI_INT, &status);
+    MPI_File_close(&fh);
 
     unsigned long long end_cycles= clock_now();
 
-    printf("%lf\n", error(dataMatrix, ATilde, n, m));
+    if(rank == 0){
+        double time_in_secs_CUDA = ((double)(start_cycles - end_cycles)) / clock_frequency;
+        printf("CUDA Reduce Sum Seconds Taken: %lf\n", time_in_secs_CUDA);
+    }
 
     free(ATilde);
     free(dataMatrix);
-
-    
-    // // MPI init stuff
-    // MPI_Init(&argc, &argv);
-    // int myrank;
-    // int numranks;
-    // MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-    // MPI_Comm_size(MPI_COMM_WORLD, &numranks);
+    free(buf);
 
 
-    
-
-    // MPI_Finalize();
+    MPI_Finalize();
 }

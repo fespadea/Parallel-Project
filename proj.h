@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <mpi.h>
 
 double normFro2(double** A, int n, int m){
     double sum = 0;
@@ -9,7 +10,10 @@ double normFro2(double** A, int n, int m){
             sum += A[i][j] * A[i][j];
         }
     }
-    return sum;
+    double totalSum = 0;
+    MPI_Reduce(&sum, &totalSum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&totalSum, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    return totalSum;
 }
 
 double norm1(double** A, int n, int m){
@@ -23,7 +27,10 @@ double norm1(double** A, int n, int m){
             sumMax = sum;
         }
     }
-    return sumMax;
+    double totalSumMax = 0;
+    MPI_Reduce(&sumMax, &totalSumMax, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&totalSumMax, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    return totalSumMax;
 }
 
 // Code from geeksforgeeks: https://www.geeksforgeeks.org/program-for-rank-of-matrix/
@@ -109,10 +116,6 @@ int rankOfMatrix(double ** mat, int R, int C)
             // Process this row again
             row--;
         }
- 
-       // Uncomment these lines to see intermediate results
-       // display(mat, R, C);
-       // printf("\n");
     }
     return rank;
 }
@@ -183,41 +186,77 @@ void mergeSort(double arr[], int l, int r)
     }
 }
 
-double ** matrixSparsification(double ** A, int n, int m, double epsilon, double delta, int sMult, double alpha){
+double ** matrixSparsification(double ** A, int n, int m, double epsilon, double delta, int sMult, double alpha, int totaln, int rank, int nranks){
     // get paramters ready
     double AF2 = normFro2(A, n, m);
     double A1 = norm1(A, n, m);
-    int k = rankOfMatrix(A, n, m);
-    int s = sMult * k * (n+m);
-    printf("s: %i\n", s);
+    int k;
+    if(rank == 0){
+        k = rankOfMatrix(A, n, m);
+    }
+    MPI_Bcast(&k, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    int s = sMult * k * (totaln + m);
 
     // calculate probabilities for each value of being chosen
     int totalLength = n*m;
-    double * probabilities = (double *)malloc(sizeof(double)*(totalLength));
+    double * probabilities = (double *)malloc(sizeof(double)*(totalLength * (rank == 0 ? nranks : 1)));
     double sum = 0;
     for(int i = 0; i < totalLength; i++){
         double Aij = A[(int)(i / m)][i % m];
         probabilities[i] = alpha * fabs(Aij) / A1 + (1 - alpha) * (Aij * Aij) / AF2;
         sum += probabilities[i];
     }
+    double totalSum = 0;
+    MPI_Reduce(&sum, &totalSum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&totalSum, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    sum = totalSum;
 
-    // choose the indexes using the probabilities
-    double * probs = (double *)malloc(sizeof(double)*s);
-    for(int i = 0; i < s; i++){
-        int ra = rand();
-        probs[i] = ((double)ra / (double)RAND_MAX) * sum;
-    }
-    mergeSort(probs, 0, s-1);
+
     int * choices = (int *)malloc(sizeof(int)*s);
-    double probSum = 0;
-    int p = 0;
-    for(int j = 0; p < s; j++){
-        probSum += probabilities[j];
-        while(probSum >= probs[p] && p < s){
-            choices[p] = j;
-            p++;
+    if(rank != 0){
+        MPI_Send(probabilities, totalLength, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD);
+
+        int i = 0;
+        do{
+            MPI_Status status;
+            MPI_Recv(choices + i, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
+        } while(choices[i++] != -1);
+    } else{
+        for(int i = 1; i < nranks; i++){
+            MPI_Status status;
+            MPI_Recv(probabilities + i*totalLength, totalLength, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, &status);
         }
+
+        // choose the indexes using the probabilities
+        double * probs = (double *)malloc(sizeof(double)*s);
+        for(int i = 0; i < s; i++){
+            probs[i] = ((double)rand() / (double)RAND_MAX) * sum;
+        }
+        mergeSort(probs, 0, s-1);
+        double probSum = 0;
+        int p = 0;
+        for(int j = 0; p < s; j++){
+            probSum += probabilities[j];
+            while(probSum >= probs[p] && p < s){
+                if(j < totalLength){
+                    choices[p] = j;
+                } else{
+                    choices[p] = -2;
+                    int choice = j % totalLength;
+                    MPI_Send(&choice, 1, MPI_INT, j/totalLength, 1, MPI_COMM_WORLD);
+                }
+                p++;
+            }
+        }
+
+        for(int i = 1; i < nranks; i++){
+            int done = -1;
+            MPI_Send(&done, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
+        }
+
+        free(probs);
     }
+
 
     // combine the chosen values into a sparse matrix
     double ** ATilde = (double**)calloc(n * sizeof(double*), sizeof(double*));
@@ -225,15 +264,18 @@ double ** matrixSparsification(double ** A, int n, int m, double epsilon, double
         ATilde[i] = (double*)calloc(m * sizeof(double), sizeof(double*));
     }
     for(int k = 0; k < s; k++){
-        int choice = choices[k];
-        int i = (int)(choice / m);
-        int j = choice % m;
-        ATilde[i][j] += A[i][j] / probabilities[choice] / s;
+        if(choices[k] >= 0){
+            int choice = choices[k];
+            int i = (int)(choice / m);
+            int j = choice % m;
+            ATilde[i][j] += A[i][j] / probabilities[choice] / s;
+        } else if(choices[k] == -1){
+            break;
+        }
     }
     
     free(probabilities);
     free(choices);
-    free(probs);
 
     return ATilde;
 }
